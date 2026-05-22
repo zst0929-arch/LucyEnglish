@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  background: #fbf7ec;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  color: #29383a;
+  font-family:
+    "Avenir Next", "Nunito Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei",
+    sans-serif;
+  background:
+    radial-gradient(circle at 6% 8%, rgba(191, 223, 242, 0.5), transparent 28rem),
+    radial-gradient(circle at 94% 12%, rgba(216, 238, 229, 0.65), transparent 30rem),
+    linear-gradient(180deg, #fbf7ec 0%, #f7fbfa 47%, #fbf7ec 100%);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+::selection {
+  background: rgba(243, 107, 42, 0.2);
+}
+
+.glass-nav {
+  background: rgba(251, 247, 236, 0.86);
+  backdrop-filter: blur(20px);
+}
+
+.section-shell {
+  width: min(1180px, calc(100% - 32px));
+  margin-inline: auto;
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+.soft-grid {
+  background-image:
+    linear-gradient(rgba(41, 56, 58, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(41, 56, 58, 0.045) 1px, transparent 1px);
+  background-size: 34px 34px;
+}
+
+.font-display {
+  font-family:
+    Georgia, "Songti SC", "Noto Serif SC", "Times New Roman", serif;
+}
+
+.video-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.36) 45%, transparent 65%);
+  transform: translateX(-100%);
+  animation: sheen 5s ease-in-out infinite;
+}
+
+@keyframes sheen {
+  0%,
+  55% {
+    transform: translateX(-100%);
+  }
+  80%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.seal-reward {
+  transform-origin: 50% 50%;
+  animation: seal-pop 1s cubic-bezier(0.19, 1, 0.22, 1) both;
+}
+
+@keyframes seal-pop {
+  0% {
+    opacity: 0;
+    transform: translate(22px, 18px) rotate(-18deg) scale(1.85);
+    filter: blur(2px);
+  }
+  62% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(-8deg) scale(0.88);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(-10deg) scale(1);
+    filter: blur(0);
+  }
+}

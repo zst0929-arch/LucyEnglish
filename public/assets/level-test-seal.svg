@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220" role="img" aria-label="Lucy Chinese Studio reward seal">
+  <defs>
+    <filter id="rough">
+      <feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="2" seed="7" />
+      <feDisplacementMap in="SourceGraphic" scale="2.8" />
+    </filter>
+  </defs>
+  <g fill="none" stroke="#c9291e" stroke-linecap="round" stroke-linejoin="round" filter="url(#rough)">
+    <circle cx="110" cy="110" r="88" stroke-width="10" opacity=".92" />
+    <circle cx="110" cy="110" r="68" stroke-width="4" opacity=".74" />
+    <path d="M54 111h112M110 54v112" stroke-width="3" opacity=".18" />
+  </g>
+  <text x="110" y="184" fill="#c9291e" font-family="Avenir Next, sans-serif" font-size="15" font-weight="800" text-anchor="middle" letter-spacing="2">
+    LUCY TEST
+  </text>
+</svg>
