@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardCheck,
+  Cpu,
   CreditCard,
   Landmark,
   MapPinned,
@@ -193,22 +194,32 @@ const features = [
 
 const studyCampHighlights = [
   {
-    en: "Visit iconic Chinese landmarks",
-    zh: "探访中国名胜古迹",
-    textEn: "Explore places such as the Great Wall, the Forbidden City, ancient streets, museums, and cultural heritage sites.",
-    textZh: "走进长城、故宫、古街、博物馆与文化遗产地，在真实场景中理解中国。"
+    icon: Landmark,
+    en: "History Journey",
+    zh: "历史之旅",
+    textEn: "Explore the Great Wall, the Forbidden City, ancient streets, museums, and historical stories across different dynasties.",
+    textZh: "走进长城、故宫、古街与博物馆，串联朝代故事、历史人物与传统建筑。"
   },
   {
-    en: "Understand Chinese history",
-    zh: "了解中国历史脉络",
-    textEn: "Learn historical stories, dynasties, traditional architecture, etiquette, festivals, and cultural symbols.",
-    textZh: "学习历史故事、朝代脉络、传统建筑、礼仪节日与文化符号。"
+    icon: Cpu,
+    en: "Technology Journey",
+    zh: "科技之旅",
+    textEn: "Visit science museums, innovation parks, high-speed rail scenes, and smart-city examples while learning modern Chinese expressions.",
+    textZh: "参访科技馆、创新园区、高铁场景与智慧城市案例，学习现代中国相关表达。"
   },
   {
-    en: "Use Chinese in real situations",
-    zh: "真实场景中文实践",
-    textEn: "Practice speaking tasks for travel, ordering food, asking directions, buying tickets, and cultural interviews.",
-    textZh: "完成旅行、点餐、问路、购票、文化采访等实用中文任务。"
+    icon: MapPinned,
+    en: "Beautiful Landscapes Journey",
+    zh: "秀丽山河之旅",
+    textEn: "Discover China's mountains, rivers, gardens, and regional scenery through travel dialogue and nature-themed vocabulary.",
+    textZh: "欣赏中国山川河流、园林风光与地域景观，在旅行对话中积累自然主题词汇。"
+  },
+  {
+    icon: Sparkles,
+    en: "Intangible Heritage Journey",
+    zh: "体验非遗文化之旅",
+    textEn: "Experience calligraphy, paper-cutting, tea culture, traditional opera, handicrafts, and festival customs through guided tasks.",
+    textZh: "体验书法、剪纸、茶文化、戏曲、手工艺与节庆习俗，在动手实践中理解非遗文化。"
   }
 ];
 
@@ -1035,15 +1046,15 @@ export default function Home() {
               </h3>
               <p className="mt-4 leading-8 text-ink/68">
                 {lang === "en"
-                  ? "A guided study camp combining Mandarin learning, landmark visits, Chinese history, cultural stories, and real-life speaking tasks."
-                  : "结合中文学习、名胜古迹探访、中国历史讲解、文化故事与真实场景表达任务，让学习者在行走中理解中国。"}
+                  ? "A guided study camp combining Mandarin learning with themed journeys through Chinese history, technology, landscapes, intangible heritage, and real-life speaking tasks."
+                  : "结合中文学习、历史之旅、科技之旅、秀丽山河之旅、非遗文化体验与真实场景表达任务，让学习者在行走中理解中国。"}
               </p>
-              <div className="mt-6 grid gap-4">
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
                 {studyCampHighlights.map((item) => (
                   <div key={item.en} className="rounded-2xl bg-ivory p-4">
                     <div className="flex items-start gap-3">
                       <span className="mt-1 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-mint text-ink">
-                        <Landmark size={18} />
+                        <item.icon size={18} />
                       </span>
                       <div>
                         <p className="font-bold text-ink">{lang === "en" ? item.en : item.zh}</p>

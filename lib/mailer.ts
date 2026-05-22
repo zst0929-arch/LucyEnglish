@@ -84,6 +84,57 @@ export async function sendBookingNotification(booking: Booking) {
   return { sent: true, to: bookingRecipient };
 }
 
+export async function sendBookingConfirmation(booking: Booking) {
+  if (!isMailerConfigured()) {
+    return {
+      sent: false,
+      reason: "QQ_SMTP_USER or QQ_SMTP_AUTH_CODE is not configured."
+    };
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: process.env.QQ_SMTP_HOST || "smtp.qq.com",
+    port: Number(process.env.QQ_SMTP_PORT || 465),
+    secure: true,
+    auth: {
+      user: process.env.QQ_SMTP_USER,
+      pass: process.env.QQ_SMTP_AUTH_CODE
+    }
+  });
+
+  await transporter.sendMail({
+    from: `"Lucy Chinese Studio" <${process.env.QQ_SMTP_USER}>`,
+    to: booking.email,
+    subject: "Your Lucy Chinese trial lesson is confirmed / 试听课预约已确认",
+    text: [
+      `Dear ${booking.name},`,
+      "",
+      "Your Lucy Chinese Studio trial lesson booking has been confirmed.",
+      `Preferred date: ${booking.date}`,
+      `Learning stage: ${stageLabel(booking.stage)}`,
+      `Chinese level: ${levelLabel(booking.chineseLevel)}`,
+      "",
+      "Teacher Lucy will contact you with the next details.",
+      "",
+      "Lucy Chinese Studio"
+    ].join("\n"),
+    html: `
+      <div style="font-family:Arial,'Microsoft YaHei',sans-serif;color:#1f2937;line-height:1.7;">
+        <h2 style="margin:0 0 14px;">试听课预约已确认</h2>
+        <p>Dear ${booking.name},</p>
+        <p>Your Lucy Chinese Studio trial lesson booking has been confirmed. Lucy老师已确认你的试听课预约。</p>
+        <div style="margin:18px 0;padding:16px;border-radius:16px;background:#f8fafc;">
+          <p style="margin:0;"><strong>Preferred date / 期望日期：</strong>${booking.date}</p>
+          <p style="margin:8px 0 0;"><strong>Learning stage / 学习阶段：</strong>${stageLabel(booking.stage)}</p>
+          <p style="margin:8px 0 0;"><strong>Chinese level / 中文基础：</strong>${levelLabel(booking.chineseLevel)}</p>
+        </div>
+        <p>Teacher Lucy will contact you with the next details.</p>
+      </div>`
+  });
+
+  return { sent: true, to: booking.email };
+}
+
 export async function sendLoginCode(email: string, code: string) {
   if (!isMailerConfigured()) {
     return {
