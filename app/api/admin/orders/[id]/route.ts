@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-api";
 import { readDb, writeDb } from "@/lib/db";
+import { sendPaymentNotification } from "@/lib/mailer";
 import { markOrderPaid } from "@/lib/wallet";
 import type { Order } from "@/lib/types";
 
@@ -24,6 +25,16 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (body.status === "paid") {
     markOrderPaid(db, order);
+    if (!order.paymentNotificationSentAt) {
+      const user = db.users.find((item) => item.id === order.userId) || null;
+      const booking = order.bookingId ? db.bookings.find((item) => item.id === order.bookingId) || null : null;
+      try {
+        const emailStatus = await sendPaymentNotification(order, user, booking);
+        if (emailStatus.sent) order.paymentNotificationSentAt = new Date().toISOString();
+      } catch (error) {
+        console.error("Payment admin notification failed", error);
+      }
+    }
   } else {
     order.status = body.status;
     if (order.bookingId) {

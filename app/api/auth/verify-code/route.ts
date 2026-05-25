@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createToken, verifyPassword } from "@/lib/auth";
 import { publicUser, readDb, writeDb } from "@/lib/db";
+import { sendRegistrationNotification } from "@/lib/mailer";
 
 export async function POST(request: Request) {
   const body = (await request.json()) as { email?: string; code?: string; name?: string };
@@ -23,6 +24,7 @@ export async function POST(request: Request) {
   }
 
   let user = db.users.find((candidate) => candidate.email === email);
+  let createdUser = false;
   if (!user) {
     user = {
       id: crypto.randomUUID(),
@@ -32,13 +34,28 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString()
     };
     db.users.push(user);
+    createdUser = true;
   }
 
   db.loginCodes = loginCodes.filter((candidate) => candidate.email !== email);
   await writeDb(db);
 
+  let registrationEmailStatus: Awaited<ReturnType<typeof sendRegistrationNotification>> | null = null;
+  if (createdUser) {
+    try {
+      registrationEmailStatus = await sendRegistrationNotification(user, "Email code login / 邮箱验证码注册");
+    } catch (error) {
+      console.error("Registration admin notification failed", error);
+      registrationEmailStatus = {
+        sent: false,
+        reason: error instanceof Error ? error.message : "Unknown email error."
+      };
+    }
+  }
+
   return NextResponse.json({
     user: publicUser(user),
-    token: createToken(user)
+    token: createToken(user),
+    registrationEmailStatus
   });
 }

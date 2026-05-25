@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createToken, hashPassword } from "@/lib/auth";
 import { publicUser, readDb, writeDb } from "@/lib/db";
+import { sendRegistrationNotification } from "@/lib/mailer";
 
 export async function POST(request: Request) {
   const body = (await request.json()) as { name?: string; email?: string; password?: string };
@@ -31,8 +32,20 @@ export async function POST(request: Request) {
   db.users.push(user);
   await writeDb(db);
 
+  let registrationEmailStatus: Awaited<ReturnType<typeof sendRegistrationNotification>>;
+  try {
+    registrationEmailStatus = await sendRegistrationNotification(user, "Password registration / 密码注册");
+  } catch (error) {
+    console.error("Registration admin notification failed", error);
+    registrationEmailStatus = {
+      sent: false,
+      reason: error instanceof Error ? error.message : "Unknown email error."
+    };
+  }
+
   return NextResponse.json({
     user: publicUser(user),
-    token: createToken(user)
+    token: createToken(user),
+    registrationEmailStatus
   });
 }

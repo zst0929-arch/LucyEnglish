@@ -41,6 +41,7 @@ export type Order = {
   status: "paid" | "pending" | "failed";
   stripeSessionId?: string;
   paidAt?: string;
+  paymentNotificationSentAt?: string;
   createdAt: string;
 };
 

@@ -1,8 +1,26 @@
 import { NextResponse } from "next/server";
 import { tokenFromRequest, verifyToken } from "@/lib/auth";
 import { readDb, writeDb } from "@/lib/db";
+import { sendPaymentNotification } from "@/lib/mailer";
 import { courseOrderFromId, createStripeCheckoutSession } from "@/lib/stripe";
 import { markOrderPaid } from "@/lib/wallet";
+
+async function notifyPaymentIfNeeded(db: Awaited<ReturnType<typeof readDb>>, order: NonNullable<Awaited<ReturnType<typeof readDb>>["orders"][number]>) {
+  if (order.status !== "paid" || order.paymentNotificationSentAt) return null;
+  const user = db.users.find((item) => item.id === order.userId) || null;
+  const booking = order.bookingId ? db.bookings.find((item) => item.id === order.bookingId) || null : null;
+  try {
+    const emailStatus = await sendPaymentNotification(order, user, booking);
+    if (emailStatus.sent) order.paymentNotificationSentAt = new Date().toISOString();
+    return emailStatus;
+  } catch (error) {
+    console.error("Payment admin notification failed", error);
+    return {
+      sent: false,
+      reason: error instanceof Error ? error.message : "Unknown email error."
+    };
+  }
+}
 
 export async function POST(request: Request) {
   const session = verifyToken(tokenFromRequest(request));
@@ -43,11 +61,14 @@ export async function POST(request: Request) {
       booking.paymentStatus = order.status === "paid" ? "paid" : "pending";
     }
     if (order.status === "paid") markOrderPaid(db, order);
+    await notifyPaymentIfNeeded(db, order);
     await writeDb(db);
   }
 
   if (order.status === "paid") {
-    return NextResponse.json({ order, checkoutUrl: `/success?order=${order.id}` });
+    const paymentEmailStatus = await notifyPaymentIfNeeded(db, order);
+    if (paymentEmailStatus?.sent) await writeDb(db);
+    return NextResponse.json({ order, paymentEmailStatus, checkoutUrl: `/success?order=${order.id}` });
   }
 
   const stripeCheckout = await createStripeCheckoutSession(request, order);

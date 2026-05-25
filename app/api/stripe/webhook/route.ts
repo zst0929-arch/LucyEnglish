@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { readDb, writeDb } from "@/lib/db";
+import { sendPaymentNotification } from "@/lib/mailer";
 import { markOrderPaid } from "@/lib/wallet";
 
 function verifyStripeSignature(payload: string, signatureHeader: string | null) {
@@ -44,6 +45,16 @@ export async function POST(request: Request) {
       if (order) {
         order.stripeSessionId ||= session?.id;
         markOrderPaid(db, order);
+        if (!order.paymentNotificationSentAt) {
+          const user = db.users.find((item) => item.id === order.userId) || null;
+          const booking = order.bookingId ? db.bookings.find((item) => item.id === order.bookingId) || null : null;
+          try {
+            const emailStatus = await sendPaymentNotification(order, user, booking);
+            if (emailStatus.sent) order.paymentNotificationSentAt = new Date().toISOString();
+          } catch (error) {
+            console.error("Payment admin notification failed", error);
+          }
+        }
         await writeDb(db);
       }
     }
