@@ -8,11 +8,10 @@ export async function GET(request: Request) {
 
   const db = await readDb();
   return NextResponse.json({
-    orders: db.orders
-      .map((order) => ({
-        ...order,
-        booking: order.bookingId ? db.bookings.find((booking) => booking.id === order.bookingId) || null : null,
-        user: db.users.find((user) => user.id === order.userId) || null
+    withdrawals: (db.withdrawals || [])
+      .map((withdrawal) => ({
+        ...withdrawal,
+        user: db.users.find((user) => user.id === withdrawal.userId) || null
       }))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   });

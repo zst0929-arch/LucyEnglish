@@ -1,71 +1,63 @@
 import { NextResponse } from "next/server";
 import { tokenFromRequest, verifyToken } from "@/lib/auth";
-import { courses } from "@/lib/courses";
 import { readDb, writeDb } from "@/lib/db";
-
-async function createStripeCheckoutSession(request: Request, orderId: string, course: (typeof courses)[number]) {
-  const secretKey = process.env.STRIPE_SECRET_KEY;
-  if (!secretKey) return null;
-
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin;
-  const params = new URLSearchParams({
-    mode: "payment",
-    success_url: `${origin}/success?order=${orderId}`,
-    cancel_url: `${origin}/#courses`,
-    client_reference_id: orderId,
-    "metadata[orderId]": orderId,
-    "metadata[courseId]": course.id,
-    "line_items[0][quantity]": "1",
-    "line_items[0][price_data][currency]": "usd",
-    "line_items[0][price_data][unit_amount]": String(course.price * 100),
-    "line_items[0][price_data][product_data][name]": `${course.title.en} - 1 Hour Chinese Lesson`,
-    "line_items[0][price_data][product_data][description]": "$49 USD per hour / 每小时 49 美元"
-  });
-
-  const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${secretKey}`,
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: params
-  });
-
-  const session = (await response.json()) as { url?: string; error?: { message?: string } };
-  if (!response.ok || !session.url) {
-    throw new Error(session.error?.message || "Stripe Checkout session could not be created.");
-  }
-
-  return session.url;
-}
+import { courseOrderFromId, createStripeCheckoutSession } from "@/lib/stripe";
+import { markOrderPaid } from "@/lib/wallet";
 
 export async function POST(request: Request) {
   const session = verifyToken(tokenFromRequest(request));
   if (!session) return NextResponse.json({ error: "Please register or log in before purchasing." }, { status: 401 });
 
-  const body = (await request.json()) as { courseId?: string };
-  const course = courses.find((item) => item.id === body.courseId);
-  if (!course) return NextResponse.json({ error: "Course not found." }, { status: 404 });
+  const body = (await request.json()) as { courseId?: string; bookingId?: string; orderId?: string };
 
   const db = await readDb();
-  const order = {
-    id: crypto.randomUUID(),
-    userId: session.sub,
-    courseId: course.id,
-    courseName: course.title.en,
-    amount: course.price,
-    currency: "USD" as const,
-    status: process.env.STRIPE_SECRET_KEY ? ("pending" as const) : ("paid" as const),
-    createdAt: new Date().toISOString()
-  };
+  let order = body.orderId ? db.orders.find((item) => item.id === body.orderId && item.userId === session.sub) : null;
 
-  db.orders.push(order);
-  await writeDb(db);
+  if (!order) {
+    const booking = body.bookingId ? db.bookings.find((item) => item.id === body.bookingId && item.userId === session.sub) : null;
+    const courseData = booking
+      ? {
+          courseId: booking.project || booking.stage,
+          courseName: `${booking.project || booking.stage} Booking`,
+          amount: booking.amount || 49
+        }
+      : courseOrderFromId(body.courseId || "");
 
-  const stripeCheckoutUrl = await createStripeCheckoutSession(request, order.id, course);
+    if (!courseData) return NextResponse.json({ error: "Course or booking not found." }, { status: 404 });
+
+    order = {
+      id: crypto.randomUUID(),
+      userId: session.sub,
+      bookingId: booking?.id,
+      courseId: courseData.courseId,
+      courseName: courseData.courseName,
+      amount: courseData.amount,
+      currency: "USD" as const,
+      status: process.env.STRIPE_SECRET_KEY ? ("pending" as const) : ("paid" as const),
+      createdAt: new Date().toISOString()
+    };
+
+    db.orders.push(order);
+    if (booking) {
+      booking.orderId = order.id;
+      booking.paymentStatus = order.status === "paid" ? "paid" : "pending";
+    }
+    if (order.status === "paid") markOrderPaid(db, order);
+    await writeDb(db);
+  }
+
+  if (order.status === "paid") {
+    return NextResponse.json({ order, checkoutUrl: `/success?order=${order.id}` });
+  }
+
+  const stripeCheckout = await createStripeCheckoutSession(request, order);
+  if (stripeCheckout?.id) {
+    order.stripeSessionId = stripeCheckout.id;
+    await writeDb(db);
+  }
 
   return NextResponse.json({
     order,
-    checkoutUrl: stripeCheckoutUrl || `/success?order=${order.id}`
+    checkoutUrl: stripeCheckout?.url || `/success?order=${order.id}`
   });
 }

@@ -2,5 +2,8 @@
   "users": [],
   "bookings": [],
   "orders": [],
+  "walletAccounts": [],
+  "walletTransactions": [],
+  "withdrawals": [],
   "loginCodes": []
 }

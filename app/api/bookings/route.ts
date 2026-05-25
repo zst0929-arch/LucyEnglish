@@ -22,29 +22,42 @@ export async function POST(request: Request) {
   const body = (await request.json()) as {
     name?: string;
     email?: string;
+    contact?: string;
     nationality?: string;
     stage?: string;
+    project?: string;
     chineseLevel?: string;
     date?: string;
+    serviceDate?: string;
+    people?: string | number;
     message?: string;
+    remarks?: string;
   };
 
   if (!body.name || !body.email || !body.stage || !body.date) {
-    return NextResponse.json({ error: "Name, email, stage, and preferred date are required." }, { status: 400 });
+    return NextResponse.json({ error: "Name, contact email, booking project, and service date are required." }, { status: 400 });
   }
 
   const db = await readDb();
+  const people = Math.max(1, Number(body.people || 1) || 1);
   const booking = {
     id: crypto.randomUUID(),
     userId: session.sub,
     name: body.name.trim(),
     email: body.email.trim().toLowerCase(),
+    contact: body.contact?.trim() || body.email.trim().toLowerCase(),
     nationality: body.nationality?.trim() || "",
     stage: body.stage,
+    project: body.project?.trim() || body.stage,
     chineseLevel: body.chineseLevel || "beginner",
     date: body.date,
+    serviceDate: body.serviceDate || body.date,
+    people,
     message: body.message?.trim() || "",
+    remarks: body.remarks?.trim() || body.message?.trim() || "",
     status: "pending" as const,
+    paymentStatus: "unpaid" as const,
+    amount: 49 * people,
     createdAt: new Date().toISOString()
   };
 

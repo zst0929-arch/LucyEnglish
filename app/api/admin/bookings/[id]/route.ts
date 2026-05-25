@@ -14,7 +14,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const { id } = await context.params;
   const body = (await request.json()) as { status?: Booking["status"] };
-  if (body.status !== "pending" && body.status !== "confirmed") {
+  if (!body.status || !["pending", "confirmed", "completed", "cancelled"].includes(body.status)) {
     return NextResponse.json({ error: "预约状态不正确。" }, { status: 400 });
   }
 

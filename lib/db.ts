@@ -8,6 +8,9 @@ const emptyDb: Database = {
   users: [],
   bookings: [],
   orders: [],
+  walletAccounts: [],
+  walletTransactions: [],
+  withdrawals: [],
   loginCodes: []
 };
 
@@ -18,6 +21,9 @@ export async function readDb(): Promise<Database> {
     return {
       ...emptyDb,
       ...db,
+      walletAccounts: db.walletAccounts || [],
+      walletTransactions: db.walletTransactions || [],
+      withdrawals: db.withdrawals || [],
       loginCodes: db.loginCodes || []
     };
   } catch {

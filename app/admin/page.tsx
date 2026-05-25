@@ -6,11 +6,13 @@ import {
   CheckCircle2,
   CreditCard,
   Database,
+  Download,
   LayoutDashboard,
   LogOut,
   RefreshCw,
   Search,
   Settings,
+  WalletCards,
   UsersRound
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -28,12 +30,20 @@ type AdminBooking = {
   userId: string;
   name: string;
   email: string;
+  contact?: string;
   nationality: string;
   stage: string;
+  project?: string;
   chineseLevel: string;
   date: string;
+  serviceDate?: string;
+  people?: number;
   message: string;
-  status: "pending" | "confirmed";
+  remarks?: string;
+  status: "pending" | "confirmed" | "completed" | "cancelled";
+  paymentStatus?: "unpaid" | "pending" | "paid" | "failed";
+  orderId?: string;
+  amount?: number;
   createdAt: string;
   user: AdminUser | null;
 };
@@ -45,8 +55,26 @@ type AdminOrder = {
   courseName: string;
   amount: number;
   currency: "USD";
-  status: "paid" | "pending";
+  status: "paid" | "pending" | "failed";
+  bookingId?: string;
+  paidAt?: string;
   createdAt: string;
+  user: AdminUser | null;
+  booking: AdminBooking | null;
+};
+
+type AdminWithdrawal = {
+  id: string;
+  userId: string;
+  amount: number;
+  currency: "USD";
+  status: "pending" | "approved" | "rejected" | "transferred";
+  accountLast4: string;
+  stripeConnectAccountId?: string;
+  stripeTransferId?: string;
+  adminNote?: string;
+  createdAt: string;
+  updatedAt: string;
   user: AdminUser | null;
 };
 
@@ -75,14 +103,17 @@ type Summary = {
   pendingBookings: number;
   orders: number;
   paidOrders: number;
+  withdrawals: number;
+  pendingWithdrawals: number;
 };
 
-type TabId = "dashboard" | "bookings" | "orders" | "users" | "courses" | "resources";
+type TabId = "dashboard" | "bookings" | "orders" | "withdrawals" | "users" | "courses" | "resources";
 
 const tabs: Array<{ id: TabId; label: string; icon: LucideIcon }> = [
   { id: "dashboard", label: "仪表盘", icon: LayoutDashboard },
   { id: "bookings", label: "预约管理", icon: CalendarCheck },
   { id: "orders", label: "订单管理", icon: CreditCard },
+  { id: "withdrawals", label: "提现审核", icon: WalletCards },
   { id: "users", label: "用户列表", icon: UsersRound },
   { id: "courses", label: "课程只读", icon: BookOpen },
   { id: "resources", label: "资源只读", icon: Database }
@@ -107,7 +138,9 @@ const emptySummary: Summary = {
   bookings: 0,
   pendingBookings: 0,
   orders: 0,
-  paidOrders: 0
+  paidOrders: 0,
+  withdrawals: 0,
+  pendingWithdrawals: 0
 };
 
 function formatDate(value: string) {
@@ -118,11 +151,29 @@ function formatDate(value: string) {
 }
 
 function bookingStatusLabel(status: AdminBooking["status"]) {
-  return status === "confirmed" ? "已确认" : "待处理";
+  const labels: Record<AdminBooking["status"], string> = {
+    pending: "待处理",
+    confirmed: "已确认",
+    completed: "已完成",
+    cancelled: "已取消"
+  };
+  return labels[status];
 }
 
 function orderStatusLabel(status: AdminOrder["status"]) {
-  return status === "paid" ? "已支付" : "待支付";
+  if (status === "paid") return "已支付";
+  if (status === "failed") return "支付失败";
+  return "待支付";
+}
+
+function withdrawalStatusLabel(status: AdminWithdrawal["status"]) {
+  const labels: Record<AdminWithdrawal["status"], string> = {
+    pending: "待审核",
+    approved: "已通过",
+    rejected: "已驳回",
+    transferred: "已划转"
+  };
+  return labels[status];
 }
 
 export default function AdminPage() {
@@ -132,12 +183,14 @@ export default function AdminPage() {
   const [summary, setSummary] = useState<Summary>(emptySummary);
   const [bookings, setBookings] = useState<AdminBooking[]>([]);
   const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [courses, setCourses] = useState<AdminCourse[]>([]);
   const [resources, setResources] = useState<AdminResource[]>([]);
   const [query, setQuery] = useState("");
   const [bookingStatus, setBookingStatus] = useState<"all" | AdminBooking["status"]>("all");
   const [orderStatus, setOrderStatus] = useState<"all" | AdminOrder["status"]>("all");
+  const [withdrawalStatus, setWithdrawalStatus] = useState<"all" | AdminWithdrawal["status"]>("all");
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
 
@@ -173,16 +226,18 @@ export default function AdminPage() {
     setLoading(true);
     setNotice("");
     try {
-      const [summaryResult, bookingsResult, ordersResult, usersResult, contentResult] = await Promise.all([
+      const [summaryResult, bookingsResult, ordersResult, withdrawalsResult, usersResult, contentResult] = await Promise.all([
         adminFetch<{ summary: Summary }>("/api/admin/summary", {}, activeToken),
         adminFetch<{ bookings: AdminBooking[] }>("/api/admin/bookings", {}, activeToken),
         adminFetch<{ orders: AdminOrder[] }>("/api/admin/orders", {}, activeToken),
+        adminFetch<{ withdrawals: AdminWithdrawal[] }>("/api/admin/withdrawals", {}, activeToken),
         adminFetch<{ users: AdminUser[] }>("/api/admin/users", {}, activeToken),
         adminFetch<{ courses: AdminCourse[]; resources: AdminResource[] }>("/api/admin/content", {}, activeToken)
       ]);
       setSummary(summaryResult.summary);
       setBookings(bookingsResult.bookings);
       setOrders(ordersResult.orders);
+      setWithdrawals(withdrawalsResult.withdrawals);
       setUsers(usersResult.users);
       setCourses(contentResult.courses);
       setResources(contentResult.resources);
@@ -228,6 +283,7 @@ export default function AdminPage() {
     setAdminEmail("");
     setBookings([]);
     setOrders([]);
+    setWithdrawals([]);
     setUsers([]);
     setCourses([]);
     setResources([]);
@@ -271,6 +327,39 @@ export default function AdminPage() {
     }
   }
 
+  async function updateWithdrawalStatus(withdrawal: AdminWithdrawal, status: AdminWithdrawal["status"]) {
+    try {
+      const result = await adminFetch<{ withdrawal: AdminWithdrawal }>(`/api/admin/withdrawals/${withdrawal.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status, adminNote: status === "transferred" ? "Transferred by admin" : "" })
+      });
+      setWithdrawals((current) => current.map((item) => (item.id === withdrawal.id ? { ...item, ...result.withdrawal } : item)));
+      await loadAdminData();
+      setNotice("提现状态已更新。");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "提现状态更新失败。");
+    }
+  }
+
+  async function exportBookings() {
+    if (!token) return;
+    try {
+      const response = await fetch("/api/admin/bookings/export", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error("预约导出失败。");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `bookings-${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "预约导出失败。");
+    }
+  }
+
   const filteredBookings = useMemo(() => {
     const keyword = query.trim().toLowerCase();
     return bookings.filter((booking) => {
@@ -290,6 +379,17 @@ export default function AdminPage() {
       return matchesStatus && (!keyword || haystack.includes(keyword));
     });
   }, [orders, orderStatus, query]);
+
+  const filteredWithdrawals = useMemo(() => {
+    const keyword = query.trim().toLowerCase();
+    return withdrawals.filter((withdrawal) => {
+      const matchesStatus = withdrawalStatus === "all" || withdrawal.status === withdrawalStatus;
+      const haystack = [withdrawal.user?.name, withdrawal.user?.email, withdrawal.accountLast4, withdrawal.stripeConnectAccountId, withdrawal.adminNote]
+        .join(" ")
+        .toLowerCase();
+      return matchesStatus && (!keyword || haystack.includes(keyword));
+    });
+  }, [withdrawals, withdrawalStatus, query]);
 
   if (!token) {
     return (
@@ -367,13 +467,15 @@ export default function AdminPage() {
 
           {activeTab === "dashboard" && (
             <div className="grid gap-6">
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
                 {[
                   ["用户数", summary.users],
                   ["预约数", summary.bookings],
                   ["待处理预约", summary.pendingBookings],
                   ["订单数", summary.orders],
-                  ["已支付订单", summary.paidOrders]
+                  ["已支付订单", summary.paidOrders],
+                  ["提现单", summary.withdrawals],
+                  ["待审提现", summary.pendingWithdrawals]
                 ].map(([label, value]) => (
                   <article key={label} className="rounded-[1.4rem] bg-white p-5 shadow-sm">
                     <p className="text-sm font-bold text-ink/54">{label}</p>
@@ -400,7 +502,13 @@ export default function AdminPage() {
                   <option value="all">全部状态</option>
                   <option value="pending">待处理</option>
                   <option value="confirmed">已确认</option>
+                  <option value="completed">已完成</option>
+                  <option value="cancelled">已取消</option>
                 </select>
+                <button type="button" onClick={exportBookings} className="inline-flex items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-bold text-white transition hover:bg-tea">
+                  <Download size={16} />
+                  导出CSV
+                </button>
               </Toolbar>
               <BookingTable bookings={filteredBookings} onUpdate={updateBookingStatus} />
             </Panel>
@@ -413,9 +521,25 @@ export default function AdminPage() {
                   <option value="all">全部状态</option>
                   <option value="pending">待支付</option>
                   <option value="paid">已支付</option>
+                  <option value="failed">失败</option>
                 </select>
               </Toolbar>
               <OrderTable orders={filteredOrders} onUpdate={updateOrderStatus} />
+            </Panel>
+          )}
+
+          {activeTab === "withdrawals" && (
+            <Panel title="提现审核">
+              <Toolbar query={query} setQuery={setQuery}>
+                <select value={withdrawalStatus} onChange={(event) => setWithdrawalStatus(event.target.value as typeof withdrawalStatus)} className="rounded-full border border-ink/10 bg-white px-4 py-2 text-sm font-bold outline-none">
+                  <option value="all">全部状态</option>
+                  <option value="pending">待审核</option>
+                  <option value="approved">已通过</option>
+                  <option value="rejected">已驳回</option>
+                  <option value="transferred">已划转</option>
+                </select>
+              </Toolbar>
+              <WithdrawalTable withdrawals={filteredWithdrawals} onUpdate={updateWithdrawalStatus} />
             </Panel>
           )}
 
@@ -552,20 +676,25 @@ function BookingTable({
               <td className="rounded-l-2xl px-4 py-3">
                 <p className="font-bold">{booking.name}</p>
                 <p className="mt-1 text-xs text-ink/55">{booking.email}</p>
-                {!compact && <p className="mt-1 text-xs text-ink/45">{booking.nationality || "未填写国籍"}</p>}
+                {!compact && <p className="mt-1 text-xs text-ink/45">{booking.contact || booking.nationality || "未填写联系方式"}</p>}
               </td>
               <td className="px-4 py-3">
-                <p className="font-bold">{stageLabels[booking.stage] || booking.stage}</p>
-                <p className="mt-1 text-xs text-ink/55">{levelLabels[booking.chineseLevel] || booking.chineseLevel}</p>
+                <p className="font-bold">{booking.project || stageLabels[booking.stage] || booking.stage}</p>
+                <p className="mt-1 text-xs text-ink/55">
+                  {levelLabels[booking.chineseLevel] || booking.chineseLevel} · {booking.people || 1}人 · ${booking.amount || 49}
+                </p>
               </td>
               <td className="px-4 py-3">
-                <p className="font-bold">{booking.date}</p>
+                <p className="font-bold">{booking.serviceDate || booking.date}</p>
                 {!compact && <p className="mt-1 text-xs text-ink/45">{formatDate(booking.createdAt)}</p>}
               </td>
               <td className="px-4 py-3">
-                <StatusPill tone={booking.status === "confirmed" ? "green" : "orange"}>{bookingStatusLabel(booking.status)}</StatusPill>
+                <StatusPill tone={booking.status === "confirmed" || booking.status === "completed" ? "green" : booking.status === "cancelled" ? "red" : "orange"}>
+                  {bookingStatusLabel(booking.status)}
+                </StatusPill>
+                {!compact && <p className="mt-2 text-xs font-bold text-ink/50">付款：{booking.paymentStatus || "unpaid"}</p>}
               </td>
-              {!compact && <td className="max-w-[260px] px-4 py-3 text-ink/62">{booking.message || "-"}</td>}
+              {!compact && <td className="max-w-[260px] px-4 py-3 text-ink/62">{booking.remarks || booking.message || "-"}</td>}
               <td className="rounded-r-2xl px-4 py-3">
                 <select
                   value={booking.status}
@@ -574,6 +703,8 @@ function BookingTable({
                 >
                   <option value="pending">待处理</option>
                   <option value="confirmed">已确认</option>
+                  <option value="completed">已完成</option>
+                  <option value="cancelled">已取消</option>
                 </select>
               </td>
             </tr>
@@ -615,9 +746,10 @@ function OrderTable({ orders, onUpdate }: { orders: AdminOrder[]; onUpdate: (ord
                 {order.currency} ${order.amount}
               </td>
               <td className="px-4 py-3">
-                <StatusPill tone={order.status === "paid" ? "green" : "orange"}>{orderStatusLabel(order.status)}</StatusPill>
+                <StatusPill tone={order.status === "paid" ? "green" : order.status === "failed" ? "red" : "orange"}>{orderStatusLabel(order.status)}</StatusPill>
+                {order.bookingId && <p className="mt-2 text-xs text-ink/45">Booking: {order.bookingId.slice(0, 8)}</p>}
               </td>
-              <td className="px-4 py-3">{formatDate(order.createdAt)}</td>
+              <td className="px-4 py-3">{formatDate(order.paidAt || order.createdAt)}</td>
               <td className="rounded-r-2xl px-4 py-3">
                 <select
                   value={order.status}
@@ -626,6 +758,7 @@ function OrderTable({ orders, onUpdate }: { orders: AdminOrder[]; onUpdate: (ord
                 >
                   <option value="pending">待支付</option>
                   <option value="paid">已支付</option>
+                  <option value="failed">失败</option>
                 </select>
               </td>
             </tr>
@@ -636,9 +769,72 @@ function OrderTable({ orders, onUpdate }: { orders: AdminOrder[]; onUpdate: (ord
   );
 }
 
-function StatusPill({ tone, children }: { tone: "green" | "orange"; children: ReactNode }) {
+function WithdrawalTable({ withdrawals, onUpdate }: { withdrawals: AdminWithdrawal[]; onUpdate: (withdrawal: AdminWithdrawal, status: AdminWithdrawal["status"]) => void }) {
+  if (withdrawals.length === 0) return <EmptyState text="暂无提现申请。" />;
+
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-black ${tone === "green" ? "bg-emerald-100 text-emerald-700" : "bg-orange-100 text-orange-700"}`}>
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[920px] border-separate border-spacing-y-2 text-left text-sm">
+        <thead className="text-xs uppercase tracking-[0.14em] text-ink/45">
+          <tr>
+            <th className="px-4 py-2">用户</th>
+            <th className="px-4 py-2">金额</th>
+            <th className="px-4 py-2">收款账号</th>
+            <th className="px-4 py-2">状态</th>
+            <th className="px-4 py-2">时间</th>
+            <th className="px-4 py-2">审核</th>
+          </tr>
+        </thead>
+        <tbody>
+          {withdrawals.map((withdrawal) => (
+            <tr key={withdrawal.id} className="bg-ivory align-top">
+              <td className="rounded-l-2xl px-4 py-3">
+                <p className="font-bold">{withdrawal.user?.name || "未知用户"}</p>
+                <p className="mt-1 text-xs text-ink/55">{withdrawal.user?.email || withdrawal.userId}</p>
+              </td>
+              <td className="px-4 py-3 font-bold">
+                {withdrawal.currency} ${withdrawal.amount}
+              </td>
+              <td className="px-4 py-3">
+                <p className="font-bold">尾号 {withdrawal.accountLast4}</p>
+                {withdrawal.stripeConnectAccountId && <p className="mt-1 text-xs text-ink/50">{withdrawal.stripeConnectAccountId}</p>}
+                {withdrawal.stripeTransferId && <p className="mt-1 text-xs text-tea">Transfer: {withdrawal.stripeTransferId}</p>}
+              </td>
+              <td className="px-4 py-3">
+                <StatusPill tone={withdrawal.status === "rejected" ? "red" : withdrawal.status === "pending" ? "orange" : "green"}>
+                  {withdrawalStatusLabel(withdrawal.status)}
+                </StatusPill>
+                {withdrawal.adminNote && <p className="mt-2 text-xs text-ink/50">{withdrawal.adminNote}</p>}
+              </td>
+              <td className="px-4 py-3">{formatDate(withdrawal.updatedAt || withdrawal.createdAt)}</td>
+              <td className="rounded-r-2xl px-4 py-3">
+                <select
+                  value={withdrawal.status}
+                  onChange={(event) => onUpdate(withdrawal, event.target.value as AdminWithdrawal["status"])}
+                  disabled={withdrawal.status === "rejected" || withdrawal.status === "transferred"}
+                  className="rounded-full border border-ink/10 bg-white px-3 py-2 text-xs font-bold outline-none disabled:opacity-50"
+                >
+                  <option value="pending">待审核</option>
+                  <option value="approved">通过</option>
+                  <option value="transferred">完成划转</option>
+                  <option value="rejected">驳回</option>
+                </select>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function StatusPill({ tone, children }: { tone: "green" | "orange" | "red"; children: ReactNode }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-black ${
+        tone === "green" ? "bg-emerald-100 text-emerald-700" : tone === "red" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"
+      }`}
+    >
       {tone === "green" && <CheckCircle2 size={13} />}
       {children}
     </span>

@@ -13,24 +13,71 @@ export type Booking = {
   userId: string;
   name: string;
   email: string;
+  contact?: string;
   nationality: string;
   stage: string;
+  project?: string;
   chineseLevel: string;
   date: string;
+  serviceDate?: string;
+  people?: number;
   message: string;
-  status: "pending" | "confirmed";
+  remarks?: string;
+  status: "pending" | "confirmed" | "completed" | "cancelled";
+  paymentStatus?: "unpaid" | "pending" | "paid" | "failed";
+  orderId?: string;
+  amount?: number;
   createdAt: string;
 };
 
 export type Order = {
   id: string;
   userId: string;
+  bookingId?: string;
   courseId: string;
   courseName: string;
   amount: number;
   currency: "USD";
-  status: "paid" | "pending";
+  status: "paid" | "pending" | "failed";
+  stripeSessionId?: string;
+  paidAt?: string;
   createdAt: string;
+};
+
+export type WalletAccount = {
+  userId: string;
+  holderName: string;
+  accountType: "bank" | "paypal" | "stripe-connect" | "other";
+  encryptedAccount: string;
+  accountLast4: string;
+  stripeConnectAccountId?: string;
+  updatedAt: string;
+};
+
+export type WalletTransaction = {
+  id: string;
+  userId: string;
+  type: "credit" | "debit";
+  amount: number;
+  currency: "USD";
+  sourceType: "order" | "withdrawal" | "adjustment";
+  sourceId: string;
+  note: string;
+  createdAt: string;
+};
+
+export type Withdrawal = {
+  id: string;
+  userId: string;
+  amount: number;
+  currency: "USD";
+  status: "pending" | "approved" | "rejected" | "transferred";
+  accountLast4: string;
+  stripeConnectAccountId?: string;
+  stripeTransferId?: string;
+  adminNote?: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type LoginCode = {
@@ -44,5 +91,8 @@ export type Database = {
   users: User[];
   bookings: Booking[];
   orders: Order[];
+  walletAccounts?: WalletAccount[];
+  walletTransactions?: WalletTransaction[];
+  withdrawals?: Withdrawal[];
   loginCodes?: LoginCode[];
 };

@@ -13,7 +13,9 @@ export async function GET(request: Request) {
       bookings: db.bookings.length,
       pendingBookings: db.bookings.filter((booking) => booking.status === "pending").length,
       orders: db.orders.length,
-      paidOrders: db.orders.filter((order) => order.status === "paid").length
+      paidOrders: db.orders.filter((order) => order.status === "paid").length,
+      withdrawals: (db.withdrawals || []).length,
+      pendingWithdrawals: (db.withdrawals || []).filter((withdrawal) => withdrawal.status === "pending").length
     }
   });
 }

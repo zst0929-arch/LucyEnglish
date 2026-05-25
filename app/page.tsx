@@ -2,6 +2,7 @@
 
 import {
   BookOpen,
+  Banknote,
   CalendarCheck,
   CheckCircle2,
   ChevronDown,
@@ -19,6 +20,7 @@ import {
   Menu,
   Sparkles,
   UserRound,
+  WalletCards,
   X
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -36,13 +38,44 @@ type BookingView = {
   id: string;
   name: string;
   email: string;
+  contact?: string;
   nationality: string;
   stage: string;
+  project?: string;
   chineseLevel: string;
   date: string;
+  serviceDate?: string;
+  people?: number;
   message: string;
-  status: "pending" | "confirmed";
+  remarks?: string;
+  status: "pending" | "confirmed" | "completed" | "cancelled";
+  paymentStatus?: "unpaid" | "pending" | "paid" | "failed";
+  orderId?: string;
+  amount?: number;
   createdAt: string;
+};
+
+type OrderView = {
+  id: string;
+  bookingId?: string;
+  courseName: string;
+  amount: number;
+  currency: "USD";
+  status: "pending" | "paid" | "failed";
+  createdAt: string;
+};
+
+type WalletView = {
+  balance: number;
+  account: null | {
+    holderName: string;
+    accountType: string;
+    accountLast4: string;
+    stripeConnectAccountId?: string;
+    updatedAt: string;
+  };
+  transactions: Array<{ id: string; type: "credit" | "debit"; amount: number; note: string; createdAt: string }>;
+  withdrawals: Array<{ id: string; amount: number; status: "pending" | "approved" | "rejected" | "transferred"; accountLast4: string; createdAt: string; updatedAt: string }>;
 };
 
 const copy = {
@@ -192,9 +225,46 @@ const features = [
   }
 ];
 
+const studyCampSlides = [
+  {
+    image: "https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=1400&q=80",
+    alt: "Great Wall of China study camp",
+    en: "History on the Great Wall",
+    zh: "长城上的历史课堂",
+    textEn: "Walk ancient routes and turn landmarks into living Mandarin prompts.",
+    textZh: "在古迹现场学习历史故事，把风景变成中文表达任务。"
+  },
+  {
+    image: "https://images.unsplash.com/photo-1545893835-abaa50cbe628?auto=format&fit=crop&w=1400&q=80",
+    alt: "Shanghai skyline technology study trip",
+    en: "Modern China and Technology",
+    zh: "现代中国与科技探索",
+    textEn: "Explore urban innovation, high-speed life, and new Chinese vocabulary.",
+    textZh: "从城市创新、高速生活到现代词汇，理解今日中国。"
+  },
+  {
+    image: "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1400&q=80",
+    alt: "Mountain and river landscape study trip",
+    en: "Mountains, Rivers, and Travel Chinese",
+    zh: "山河风光与旅行中文",
+    textEn: "Learn scenic descriptions, travel dialogue, and nature-themed words.",
+    textZh: "学习风景描述、旅行对话与自然主题词汇。"
+  },
+  {
+    image: "https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=1400&q=80",
+    alt: "Chinese traditional culture workshop",
+    en: "Hands-on Heritage Workshops",
+    zh: "动手体验非遗文化",
+    textEn: "Practice language through calligraphy, crafts, tea, and festival customs.",
+    textZh: "在书法、手作、茶文化和节俗体验中练中文。"
+  }
+];
+
 const studyCampHighlights = [
   {
     icon: Landmark,
+    image: "https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=900&q=80",
+    imageAlt: "Great Wall and Chinese historical architecture",
     en: "History Journey",
     zh: "历史之旅",
     textEn: "Explore the Great Wall, the Forbidden City, ancient streets, museums, and historical stories across different dynasties.",
@@ -202,6 +272,8 @@ const studyCampHighlights = [
   },
   {
     icon: Cpu,
+    image: "https://images.unsplash.com/photo-1545893835-abaa50cbe628?auto=format&fit=crop&w=900&q=80",
+    imageAlt: "Modern Chinese city and technology study trip",
     en: "Technology Journey",
     zh: "科技之旅",
     textEn: "Visit science museums, innovation parks, high-speed rail scenes, and smart-city examples while learning modern Chinese expressions.",
@@ -209,6 +281,8 @@ const studyCampHighlights = [
   },
   {
     icon: MapPinned,
+    image: "https://images.unsplash.com/photo-1518002054494-3a6f94352e9d?auto=format&fit=crop&w=900&q=80",
+    imageAlt: "Chinese mountain and river landscape",
     en: "Beautiful Landscapes Journey",
     zh: "秀丽山河之旅",
     textEn: "Discover China's mountains, rivers, gardens, and regional scenery through travel dialogue and nature-themed vocabulary.",
@@ -216,6 +290,8 @@ const studyCampHighlights = [
   },
   {
     icon: Sparkles,
+    image: "https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=900&q=80",
+    imageAlt: "Calligraphy brush and traditional craft activity",
     en: "Intangible Heritage Journey",
     zh: "体验非遗文化之旅",
     textEn: "Experience calligraphy, paper-cutting, tea culture, traditional opera, handicrafts, and festival customs through guided tasks.",
@@ -447,6 +523,8 @@ export default function Home() {
   const [codeEmail, setCodeEmail] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [bookings, setBookings] = useState<BookingView[]>([]);
+  const [orders, setOrders] = useState<OrderView[]>([]);
+  const [wallet, setWallet] = useState<WalletView | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState("");
   const [notice, setNotice] = useState("");
@@ -457,6 +535,7 @@ export default function Home() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [testSubmitted, setTestSubmitted] = useState(false);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [currentStudySlide, setCurrentStudySlide] = useState(0);
   const [typedReport, setTypedReport] = useState("");
   const t = copy[lang];
   const testScore = placementQuestions.filter((question) => testAnswers[question.id] === question.answer).length;
@@ -469,6 +548,7 @@ export default function Home() {
     lang === "en"
       ? `${testResult.report} Next stage: ${testResult.next} Age ${testProfile.age || "-"}, learning time ${testProfile.duration || "-"}.`
       : `${testResult.report} 下一阶段：${testResult.next} 年龄${testProfile.age || "-"}，已学${testProfile.duration || "-"}。`;
+  const activeStudySlide = studyCampSlides[currentStudySlide];
 
   useEffect(() => {
     const savedToken = localStorage.getItem("lucy-token") || "";
@@ -482,10 +562,20 @@ export default function Home() {
   useEffect(() => {
     if (!token) {
       setBookings([]);
+      setOrders([]);
+      setWallet(null);
       return;
     }
-    void loadBookings(token);
+    void loadAccountData(token);
   }, [token]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setCurrentStudySlide((current) => (current + 1) % studyCampSlides.length);
+    }, 5200);
+
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (!testSubmitted) {
@@ -519,6 +609,10 @@ export default function Home() {
 
   function moveQuestion(direction: 1 | -1) {
     setCurrentQuestionIndex((current) => Math.min(Math.max(current + direction, 0), placementQuestions.length - 1));
+  }
+
+  function moveStudySlide(direction: 1 | -1) {
+    setCurrentStudySlide((current) => (current + direction + studyCampSlides.length) % studyCampSlides.length);
   }
 
   function handlePlacementStart(event: FormEvent<HTMLFormElement>) {
@@ -570,6 +664,20 @@ export default function Home() {
     });
     const result = await response.json();
     if (response.ok) setBookings(result.bookings || []);
+  }
+
+  async function loadAccountData(activeToken = token) {
+    if (!activeToken) return;
+    const headers = { Authorization: `Bearer ${activeToken}` };
+    const [bookingResponse, orderResponse, walletResponse] = await Promise.all([
+      fetch("/api/bookings", { headers }),
+      fetch("/api/orders", { headers }),
+      fetch("/api/wallet", { headers })
+    ]);
+    const [bookingResult, orderResult, walletResult] = await Promise.all([bookingResponse.json(), orderResponse.json(), walletResponse.json()]);
+    if (bookingResponse.ok) setBookings(bookingResult.bookings || []);
+    if (orderResponse.ok) setOrders(orderResult.orders || []);
+    if (walletResponse.ok) setWallet(walletResult);
   }
 
   function stageLabel(stage: string) {
@@ -684,8 +792,8 @@ export default function Home() {
     });
     const result = await response.json();
     if (!response.ok) return setNotice(result.error || "Booking failed.");
-    setNotice(t.successBooking);
-    await loadBookings();
+    setNotice(lang === "en" ? "Booking submitted. You can pay from My Bookings." : "预约已提交，可在我的预约中付款。");
+    await loadAccountData();
     event.currentTarget.reset();
   }
 
@@ -705,6 +813,62 @@ export default function Home() {
     const result = await response.json();
     if (!response.ok) return setNotice(result.error || "Checkout failed.");
     window.location.href = result.checkoutUrl;
+  }
+
+  async function handleBookingPayment(bookingId: string) {
+    if (!token) {
+      openAuthModal();
+      return setNotice(lang === "en" ? "Please register or log in first." : "请先注册或登录。");
+    }
+    const response = await fetch("/api/checkout", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ bookingId })
+    });
+    const result = await response.json();
+    if (!response.ok) return setNotice(result.error || "Payment failed.");
+    window.location.href = result.checkoutUrl;
+  }
+
+  async function handleWalletAccount(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token) return openAuthModal();
+    const form = new FormData(event.currentTarget);
+    const response = await fetch("/api/wallet", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(Object.fromEntries(form.entries()))
+    });
+    const result = await response.json();
+    if (!response.ok) return setNotice(result.error || "Payout account save failed.");
+    setNotice(lang === "en" ? "Payout account saved securely." : "收款账号已加密保存。");
+    await loadAccountData();
+    event.currentTarget.reset();
+  }
+
+  async function handleWithdrawal(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token) return openAuthModal();
+    const form = new FormData(event.currentTarget);
+    const response = await fetch("/api/withdrawals", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ amount: form.get("amount") })
+    });
+    const result = await response.json();
+    if (!response.ok) return setNotice(result.error || "Withdrawal failed.");
+    setNotice(lang === "en" ? "Withdrawal request submitted for admin review." : "提现申请已提交后台审核。");
+    await loadAccountData();
+    event.currentTarget.reset();
   }
 
   return (
@@ -1019,21 +1183,58 @@ export default function Home() {
 
         <div className="mt-8 overflow-hidden rounded-[2.2rem] bg-white shadow-soft">
           <div className="grid lg:grid-cols-[.95fr_1.05fr]">
-            <div className="relative min-h-[360px]">
-              <img
-                src="https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=1400&q=80"
-                alt="Great Wall of China study camp"
-                className="h-full min-h-[360px] w-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-ink/75 via-ink/15 to-transparent" />
+            <div className="group relative min-h-[520px] overflow-hidden bg-ink">
+              {studyCampSlides.map((slide, index) => (
+                <img
+                  key={slide.image}
+                  src={slide.image}
+                  alt={slide.alt}
+                  className={`absolute inset-0 h-full w-full object-cover transition duration-700 ${
+                    index === currentStudySlide ? "scale-100 opacity-100" : "scale-105 opacity-0"
+                  }`}
+                />
+              ))}
+              <div className="absolute inset-0 bg-gradient-to-t from-ink/82 via-ink/28 to-ink/5" />
+              <div className="absolute inset-x-5 top-5 flex items-center justify-between gap-3">
+                <div className="flex gap-2">
+                  {studyCampSlides.map((slide, index) => (
+                    <button
+                      key={slide.image}
+                      type="button"
+                      onClick={() => setCurrentStudySlide(index)}
+                      aria-label={`Show ${slide.en}`}
+                      className={`h-2.5 rounded-full transition ${index === currentStudySlide ? "w-9 bg-white" : "w-2.5 bg-white/48 hover:bg-white/80"}`}
+                    />
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => moveStudySlide(-1)}
+                    aria-label="Previous study camp image"
+                    className="grid h-10 w-10 place-items-center rounded-full bg-white/90 text-ink shadow-card transition hover:bg-mint"
+                  >
+                    <MoveLeft size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveStudySlide(1)}
+                    aria-label="Next study camp image"
+                    className="grid h-10 w-10 place-items-center rounded-full bg-white/90 text-ink shadow-card transition hover:bg-mint"
+                  >
+                    <MoveRight size={18} />
+                  </button>
+                </div>
+              </div>
               <div className="absolute bottom-6 left-6 right-6 text-white">
                 <span className="inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-sm font-black text-ink">
                   <MapPinned size={17} />
                   {lang === "en" ? "China Study Camp" : "中国研学营"}
                 </span>
                 <h3 className="mt-4 font-display text-4xl font-bold md:text-5xl">
-                  {lang === "en" ? "Walk Through China, Learn Chinese History" : "行走中国，读懂历史"}
+                  {lang === "en" ? activeStudySlide.en : activeStudySlide.zh}
                 </h3>
+                <p className="mt-3 max-w-xl text-base font-semibold leading-7 text-white/78">{lang === "en" ? activeStudySlide.textEn : activeStudySlide.textZh}</p>
               </div>
             </div>
 
@@ -1051,14 +1252,20 @@ export default function Home() {
               </p>
               <div className="mt-6 grid gap-4 md:grid-cols-2">
                 {studyCampHighlights.map((item) => (
-                  <div key={item.en} className="rounded-2xl bg-ivory p-4">
-                    <div className="flex items-start gap-3">
-                      <span className="mt-1 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-mint text-ink">
+                  <div key={item.en} className="group overflow-hidden rounded-2xl bg-ivory shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-card">
+                    <div className="relative h-32 overflow-hidden">
+                      <img src={item.image} alt={item.imageAlt} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-ink/55 to-transparent" />
+                      <span className="absolute bottom-3 left-3 grid h-9 w-9 place-items-center rounded-full bg-white/92 text-ink shadow-sm">
                         <item.icon size={18} />
                       </span>
-                      <div>
-                        <p className="font-bold text-ink">{lang === "en" ? item.en : item.zh}</p>
-                        <p className="mt-1 text-sm leading-6 text-ink/62">{lang === "en" ? item.textEn : item.textZh}</p>
+                    </div>
+                    <div className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div>
+                          <p className="font-bold text-ink">{lang === "en" ? item.en : item.zh}</p>
+                          <p className="mt-1 text-sm leading-6 text-ink/62">{lang === "en" ? item.textEn : item.textZh}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1446,12 +1653,12 @@ export default function Home() {
 
           <div className="grid gap-5 xl:grid-cols-[1.05fr_.95fr]">
             <form onSubmit={handleBooking} className="rounded-[2rem] bg-white p-6 shadow-card">
-              <h3 className="text-2xl font-bold">{lang === "en" ? "Trial Lesson Booking" : "试听课预约"}</h3>
+              <h3 className="text-2xl font-bold">{lang === "en" ? "Submit Booking" : "提交预订"}</h3>
               <Field name="name" label={t.name} icon={UserRound} defaultValue={user?.name || ""} required />
               <Field name="email" label={t.email} icon={Mail} type="email" defaultValue={user?.email || ""} required />
-              <Field name="nationality" label={t.nationality} icon={Languages} />
+              <Field name="contact" label={lang === "en" ? "Contact phone / WhatsApp / WeChat" : "联系方式 / 微信 / WhatsApp"} icon={Mail} required />
               <label className="mt-4 block text-sm font-bold text-ink/68">
-                {lang === "en" ? "Learning stage" : "学习阶段"}
+                {lang === "en" ? "Booking project" : "预订项目"}
                 <select name="stage" className="mt-2 w-full rounded-2xl border border-ink/10 bg-ivory px-4 py-3 outline-none focus:border-tea" required>
                   <option value="young-children">Young Children 3-6 / 幼儿启蒙</option>
                   <option value="children-teens">Children & Teens 7-16 / 少儿进阶</option>
@@ -1459,6 +1666,7 @@ export default function Home() {
                   <option value="china-study-camp">China Study Camp / 中国研学营</option>
                 </select>
               </label>
+              <input type="hidden" name="project" value="Lucy Chinese service booking" />
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <label className="block text-sm font-bold text-ink/68">
                   {t.level}
@@ -1470,17 +1678,24 @@ export default function Home() {
                 </label>
                 <Field
                   name="date"
-                  label={lang === "en" ? "Google Calendar trial date" : "Google Calendar 试听日期"}
+                  label={lang === "en" ? "Travel / service date" : "出行 / 服务日期"}
                   icon={CalendarCheck}
                   type="date"
                   required
                   compact
                 />
               </div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <Field name="people" label={lang === "en" ? "People" : "人数"} icon={UserRound} type="number" defaultValue="1" required compact />
+                <Field name="nationality" label={t.nationality} icon={Languages} compact />
+              </div>
               <label className="mt-4 block text-sm font-bold text-ink/68">
-                {t.message}
+                {lang === "en" ? "Notes / special requests" : "备注信息 / 特殊需求"}
                 <textarea name="message" rows={3} className="mt-2 w-full resize-none rounded-2xl border border-ink/10 bg-ivory px-4 py-3 outline-none focus:border-tea" />
               </label>
+              <p className="mt-4 rounded-2xl bg-ivory p-4 text-sm font-bold text-ink/62">
+                {lang === "en" ? "System price: $49 USD per person/hour. A payment order is created after submission." : "系统价格：49美元 / 人 / 小时。提交后自动生成关联支付订单。"}
+              </p>
               <button className="mt-5 w-full rounded-full bg-tea px-5 py-3 font-bold text-white hover:bg-ink">{t.submitBooking}</button>
             </form>
 
@@ -1488,8 +1703,8 @@ export default function Home() {
               <h3 className="text-2xl font-bold">{t.myBookings}</h3>
               <p className="mt-3 text-sm leading-6 text-ink/60">
                 {lang === "en"
-                  ? "After booking, add the trial lesson date to Google Calendar and view your submitted requests here."
-                  : "提交预约后，可一键加入 Google Calendar，并在这里查看已提交的预约。"}
+                  ? "After booking, track status, pay linked orders, and add the service date to Google Calendar."
+                  : "提交预订后，可查看状态、支付关联订单，并一键加入 Google Calendar。"}
               </p>
               <div className="mt-5 grid gap-3">
                 {bookings.length === 0 ? (
@@ -1499,19 +1714,120 @@ export default function Home() {
                     <article key={booking.id} className="rounded-2xl bg-white p-4">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                          <p className="font-bold text-ink">{stageLabel(booking.stage)}</p>
-                          <p className="mt-1 text-sm text-ink/55">{booking.date} · {booking.status}</p>
+                          <p className="font-bold text-ink">{booking.project || stageLabel(booking.stage)}</p>
+                          <p className="mt-1 text-sm text-ink/55">
+                            {booking.serviceDate || booking.date} · {booking.status} · {booking.paymentStatus || "unpaid"}
+                          </p>
+                          <p className="mt-1 text-xs font-bold text-tea">
+                            USD ${booking.amount || 49} · {booking.people || 1} {lang === "en" ? "people" : "人"}
+                          </p>
                         </div>
-                        <a
-                          href={googleCalendarUrl(booking)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="rounded-full bg-ink px-4 py-2 text-xs font-bold text-white transition hover:bg-tea"
-                        >
-                          {t.addToGoogle}
-                        </a>
+                        <div className="flex flex-wrap gap-2">
+                          {(booking.paymentStatus || "unpaid") !== "paid" && (
+                            <button
+                              type="button"
+                              onClick={() => handleBookingPayment(booking.id)}
+                              className="rounded-full bg-tea px-4 py-2 text-xs font-bold text-white transition hover:bg-ink"
+                            >
+                              {lang === "en" ? "Pay now" : "立即付款"}
+                            </button>
+                          )}
+                          <a
+                            href={googleCalendarUrl(booking)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-full bg-ink px-4 py-2 text-xs font-bold text-white transition hover:bg-tea"
+                          >
+                            {t.addToGoogle}
+                          </a>
+                        </div>
                       </div>
-                      {booking.message && <p className="mt-3 text-sm leading-6 text-ink/60">{booking.message}</p>}
+                      {(booking.remarks || booking.message) && <p className="mt-3 text-sm leading-6 text-ink/60">{booking.remarks || booking.message}</p>}
+                    </article>
+                  ))
+                )}
+              </div>
+            </section>
+          </div>
+
+          <div className="mt-6 grid gap-5 xl:grid-cols-[.95fr_1.05fr]">
+            <section className="rounded-[2rem] bg-white p-6 shadow-card">
+              <div className="flex items-center gap-3">
+                <span className="grid h-11 w-11 place-items-center rounded-2xl bg-mint text-ink">
+                  <WalletCards size={21} />
+                </span>
+                <div>
+                  <h3 className="text-2xl font-bold">{lang === "en" ? "Balance & Withdrawals" : "余额与提现"}</h3>
+                  <p className="text-sm font-semibold text-ink/55">
+                    {lang === "en" ? "Available balance" : "可提现余额"}: USD ${wallet?.balance?.toFixed(2) || "0.00"}
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleWalletAccount} className="mt-5 grid gap-4">
+                <Field name="holderName" label={lang === "en" ? "Account holder" : "收款人姓名"} icon={UserRound} defaultValue={wallet?.account?.holderName || ""} required compact />
+                <label className="block text-sm font-bold text-ink/68">
+                  {lang === "en" ? "Payout account type" : "收款账号类型"}
+                  <select name="accountType" defaultValue={wallet?.account?.accountType || "bank"} className="mt-2 w-full rounded-2xl border border-ink/10 bg-ivory px-4 py-3 outline-none focus:border-tea">
+                    <option value="bank">Bank account / 银行账户</option>
+                    <option value="paypal">PayPal</option>
+                    <option value="stripe-connect">Stripe Connect</option>
+                    <option value="other">Other / 其他</option>
+                  </select>
+                </label>
+                <Field name="accountIdentifier" label={lang === "en" ? "Account details" : "收款账号信息"} icon={Lock} required compact />
+                <Field name="stripeConnectAccountId" label={lang === "en" ? "Stripe Connect ID (optional)" : "Stripe Connect账号ID（可选）"} icon={CreditCard} compact />
+                {wallet?.account && (
+                  <p className="rounded-2xl bg-ivory p-3 text-xs font-bold text-ink/55">
+                    {lang === "en" ? "Saved account ending" : "已保存账号尾号"} {wallet.account.accountLast4}
+                  </p>
+                )}
+                <button className="rounded-full bg-ink px-5 py-3 font-bold text-white transition hover:bg-tea">
+                  {lang === "en" ? "Save payout account" : "保存收款账号"}
+                </button>
+              </form>
+
+              <form onSubmit={handleWithdrawal} className="mt-5 rounded-3xl bg-ivory p-4">
+                <Field name="amount" label={lang === "en" ? "Withdrawal amount (USD)" : "提现金额（美元）"} icon={Banknote} type="number" inputMode="decimal" required compact />
+                <button className="mt-4 w-full rounded-full bg-tea px-5 py-3 font-bold text-white transition hover:bg-ink">
+                  {lang === "en" ? "Submit withdrawal" : "提交提现申请"}
+                </button>
+              </form>
+            </section>
+
+            <section className="rounded-[2rem] bg-ivory p-6 shadow-card">
+              <h3 className="text-2xl font-bold">{lang === "en" ? "Orders & Withdrawal Records" : "订单与提现记录"}</h3>
+              <div className="mt-5 grid gap-3">
+                {orders.length === 0 ? (
+                  <p className="rounded-2xl bg-white p-4 text-sm font-bold text-ink/50">{lang === "en" ? "No orders yet." : "暂无订单。"}</p>
+                ) : (
+                  orders.slice(0, 4).map((order) => (
+                    <article key={order.id} className="rounded-2xl bg-white p-4 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-bold text-ink">{order.courseName}</p>
+                        <span className="rounded-full bg-mint px-3 py-1 text-xs font-black text-ink">{order.status}</span>
+                      </div>
+                      <p className="mt-2 font-bold text-tea">
+                        {order.currency} ${order.amount}
+                      </p>
+                    </article>
+                  ))
+                )}
+              </div>
+
+              <div className="mt-5 grid gap-3">
+                {(wallet?.withdrawals || []).length === 0 ? (
+                  <p className="rounded-2xl bg-white p-4 text-sm font-bold text-ink/50">{lang === "en" ? "No withdrawal records." : "暂无提现记录。"}</p>
+                ) : (
+                  wallet?.withdrawals.slice(0, 5).map((withdrawal) => (
+                    <article key={withdrawal.id} className="rounded-2xl bg-white p-4 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-bold text-ink">USD ${withdrawal.amount}</p>
+                        <span className="rounded-full bg-ink px-3 py-1 text-xs font-black text-white">{withdrawal.status}</span>
+                      </div>
+                      <p className="mt-2 text-xs text-ink/52">
+                        {lang === "en" ? "Account ending" : "账号尾号"} {withdrawal.accountLast4} · {new Date(withdrawal.updatedAt || withdrawal.createdAt).toLocaleDateString()}
+                      </p>
                     </article>
                   ))
                 )}
