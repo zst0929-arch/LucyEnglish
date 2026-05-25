@@ -3,6 +3,11 @@ import { hashPassword } from "@/lib/auth";
 import { readDb, writeDb } from "@/lib/db";
 import { sendLoginCode } from "@/lib/mailer";
 
+function canExposeDevCode(request: Request) {
+  const hostname = new URL(request.url).hostname;
+  return process.env.SHOW_LOGIN_CODE === "true" || hostname === "localhost" || hostname === "127.0.0.1";
+}
+
 export async function POST(request: Request) {
   const body = (await request.json()) as { email?: string };
   const email = body.email?.trim().toLowerCase();
@@ -24,6 +29,20 @@ export async function POST(request: Request) {
   });
   await writeDb(db);
 
-  const emailStatus = await sendLoginCode(email, code);
+  let emailStatus: Awaited<ReturnType<typeof sendLoginCode>> & { devCode?: string };
+  try {
+    emailStatus = await sendLoginCode(email, code);
+  } catch (error) {
+    console.error("Login code email failed", error);
+    emailStatus = {
+      sent: false,
+      reason: error instanceof Error ? error.message : "Verification email could not be sent."
+    };
+  }
+
+  if (!emailStatus.sent && canExposeDevCode(request)) {
+    emailStatus.devCode = code;
+  }
+
   return NextResponse.json({ emailStatus });
 }

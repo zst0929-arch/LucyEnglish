@@ -139,8 +139,7 @@ export async function sendLoginCode(email: string, code: string) {
   if (!isMailerConfigured()) {
     return {
       sent: false,
-      reason: "QQ_SMTP_USER or QQ_SMTP_AUTH_CODE is not configured.",
-      devCode: code
+      reason: "QQ_SMTP_USER or QQ_SMTP_AUTH_CODE is not configured."
     };
   }
 

@@ -741,13 +741,17 @@ export default function Home() {
     if (!response.ok) return setNotice(result.error || "Code request failed.");
     setCodeEmail(email);
     setCodeSent(true);
-    setNotice(
-      result.emailStatus?.devCode
-        ? `${lang === "en" ? "Development code" : "本地测试验证码"}: ${result.emailStatus.devCode}`
-        : lang === "en"
-          ? "Verification code sent."
-          : "验证码已发送。"
-    );
+    if (result.emailStatus?.devCode) {
+      setNotice(
+        `${lang === "en" ? "Email service is not available, use this local test code" : "邮件服务暂不可用，请使用这个本地测试验证码"}: ${result.emailStatus.devCode}`
+      );
+    } else if (result.emailStatus?.sent) {
+      setNotice(lang === "en" ? "Verification code sent. Please check inbox and spam folder." : "验证码已发送，请检查收件箱和垃圾邮件。");
+    } else {
+      setNotice(
+        `${lang === "en" ? "Verification email could not be sent" : "验证码邮件发送失败"}: ${result.emailStatus?.reason || "Unknown error"}`
+      );
+    }
   }
 
   async function handleCodeLogin(event: FormEvent<HTMLFormElement>) {
@@ -1022,6 +1026,8 @@ export default function Home() {
                 {t.register}
               </button>
             </div>
+
+            {notice && <p className="mt-4 whitespace-pre-wrap rounded-2xl bg-mint p-4 text-sm font-bold leading-6 text-ink">{notice}</p>}
 
             {authMode === "login" && loginMethod === "code" ? (
               <div className="mt-5 grid gap-4">
